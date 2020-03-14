@@ -37,30 +37,33 @@ class Turtlebot3Action(object):
         self.stats_sub = rospy.Subscriber('joint_states', JointState, self.get_state)
         self.odom_sub = rospy.Subscriber('odom', Odometry, self.get_odom)
         self.init_stats = True
+        self.last_pos = 0.0
         self._as.start()
-        rospy.loginfo('Server On')
+        rospy.loginfo('Server On On')
 
     def get_odom(self, odom):
         self.position = Point()
         self.position = odom.pose.pose.position
+    
 
     def get_state(self, data):
         TICK2RAD = 0.001533981
-        last_pos = 0.0
-        diff_pos = 0.0
         cur_pos = 0.0
         encoder = 0
 
         cur_pos = data.position[0]
-        diff_pos = cur_pos - last_pos
-        encoder = encoder + (diff_pos / TICK2RAD)
+        encoder = (cur_pos / TICK2RAD)
         self.right_encoder = encoder
+        if (abs(cur_pos - self.last_pos) >= 0.5):
+            rospy.loginfo('cur_pos, encoder = '+ str(cur_pos) + ' ' + str(encoder) )
+            self.last_pos = cur_pos
 
     def turn(self, angle):
         if self.init_stats:
             self.init_right_encoder = self.right_encoder
             self.init_stats = False
         diff_encoder = (np.deg2rad(angle) * 0.080) / (0.207 / 4096)
+        rospy.loginfo('diff_encoder = '+ str(diff_encoder) )
         while (abs(self.init_right_encoder - self.right_encoder) < abs(diff_encoder)):
             if diff_encoder >= 0:
                 self.twist.angular.z = -0.5
@@ -75,14 +78,19 @@ class Turtlebot3Action(object):
         self.r.sleep()
 
     def go_front(self, lenght, count):
+        self.init_position = Point()
+        self.init_position = self.position
+        rospy.loginfo("length = " + str(lenght) + "count = " + str(count))
+        rospy.loginfo("Init pos = " + str(self.init_position))
         if count == 0:
-            while self.position.x  < lenght:
+            while (self.position.x - self.init_position.x) < lenght:
                 self.twist.linear.x = 0.1
                 self.twist.angular.z = 0.0
                 self.cmd_pub.publish(self.twist)
                 self.r.sleep()
         elif count == 1:
-            while self.position.y < lenght:
+            while (self.position.y - self.init_position.y) < lenght:
+                rospy.loginfo("cur pos = " + str(self.position))
                 self.twist.linear.x = 0.1
                 self.twist.angular.z = 0.0
                 self.cmd_pub.publish(self.twist)
@@ -104,13 +112,14 @@ class Turtlebot3Action(object):
         self.r.sleep()
 
     def execute_cb(self, goal):
-        position = Point()
+        
         self.cmd_pub = rospy.Publisher('cmd_vel', Twist, queue_size=5)
         self.twist = Twist()
         self.r = rospy.Rate(15)
         self.r1 = rospy.Rate(1)
         success = True
         mode = goal.goal.x
+        rospy.loginfo("mode = " + str(mode) + " area = " + str(goal.goal.y))
         patrol_count = int(goal.goal.z)
         circle_mode = True
         half_patrol = False
