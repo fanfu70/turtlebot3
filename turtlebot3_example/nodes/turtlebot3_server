@@ -38,12 +38,16 @@ class Turtlebot3Action(object):
         self.odom_sub = rospy.Subscriber('odom', Odometry, self.get_odom)
         self.init_stats = True
         self.last_pos = 0.0
+        self.last_position = Point()
         self._as.start()
         rospy.loginfo('Server On On')
 
     def get_odom(self, odom):
         self.position = Point()
         self.position = odom.pose.pose.position
+        if ((abs(self.position.x - self.last_position.x) >= 0.05) or ( abs(self.position.y - self.last_position.y) >= 0.05) ):
+            rospy.loginfo("Position = " + str(self.position))
+            self.last_position = self.position
     
 
     def get_state(self, data):
@@ -62,7 +66,7 @@ class Turtlebot3Action(object):
         if self.init_stats:
             self.init_right_encoder = self.right_encoder
             self.init_stats = False
-        diff_encoder = (np.deg2rad(angle) * 0.080) / (0.207 / 4096)
+        diff_encoder = (np.deg2rad(angle) * 0.080) / (0.207345112 / 4096)
         rospy.loginfo('diff_encoder = '+ str(diff_encoder) )
         while (abs(self.init_right_encoder - self.right_encoder) < abs(diff_encoder)):
             if diff_encoder >= 0:
@@ -89,8 +93,7 @@ class Turtlebot3Action(object):
                 self.cmd_pub.publish(self.twist)
                 self.r.sleep()
         elif count == 1:
-            while (self.position.y - self.init_position.y) < lenght:
-                rospy.loginfo("cur pos = " + str(self.position))
+            while (self.position.y - self.init_position.y) < lenght:                
                 self.twist.linear.x = 0.1
                 self.twist.angular.z = 0.0
                 self.cmd_pub.publish(self.twist)
